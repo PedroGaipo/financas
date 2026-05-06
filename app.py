@@ -206,7 +206,7 @@ with col_btn1:
     with st.popover("Nova Despesa", use_container_width=True):
         cat_d = st.text_input("Categoria", key="cat_d")
         desc_d = st.text_input("Descrição", key="desc_d")
-        val_d = st.number_input("Valor", min_value=0.01, key="val_d")  # min_value > 0
+        val_d = st.number_input("Valor", min_value=0.01, key="val_d")
         dat_d = st.date_input("Data", date.today(), key="dat_d")
         rec_d = st.checkbox("Recorrente?", key="rec_d")
         if st.button("Confirmar Despesa") and cat_d.strip() and val_d > 0:
@@ -226,7 +226,7 @@ with col_btn2:
 
 st.divider()
 
-tab1, tab2, tab3, tab4 = st.tabs(["📊 Visão Geral", "📈 Gráficos", "💸 Financiamentos", "⚙️ Configurações"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 Visão Geral", "📈 Gráficos", "💸 Financiamentos", "💹 Investimentos", "⚙️ Configurações"])
 
 conn = sqlite3.connect('financas.db')
 df_bruto = pd.read_sql_query("SELECT * FROM transacoes WHERE perfil = ?", conn, params=(st.session_state['perfil_ativo'],))
@@ -452,8 +452,110 @@ with tab3:
                 st.success("Financiamento excluído.")
                 st.rerun()
 
-# ===================== TAB 4 — CONFIGURAÇÕES =====================
+# ===================== TAB 4 — INVESTIMENTOS =====================
 with tab4:
+    st.header("💹 Investimentos")
+    
+    # ✅ CDI EDITÁVEL
+    col_cdi1, col_cdi2 = st.columns([1, 4])
+    with col_cdi1:
+        st.session_state.cdi_anual = st.number_input(
+            "🟢 CDI Atual (a.a.)", 
+            min_value=0.0, max_value=50.0, 
+            value=14.83, step=0.01, format="%.2f", 
+            help="Consulte B3/Cetip para valor atual"
+        ) / 100  # Converte % para decimal
+    with col_cdi2:
+        st.caption("💡 *Atualize diariamente na B3. Ex: 14,83% = 0,1483*")
+    
+    st.divider()
+    
+    # Calculadora Principal
+    st.subheader("🧮 Simulador de Investimentos")
+    col_calc1, col_calc2 = st.columns(2)
+    
+    with col_calc1:
+        valor_inicial = st.number_input("💰 Valor Inicial", min_value=0.01, 
+                                       value=10000.0, step=100.0, format="%.2f")
+        aportes_mensais = st.number_input("📈 Aporte Mensal", min_value=0.0, 
+                                         value=500.0, step=100.0, format="%.2f")
+        meses = st.number_input("📅 Período (meses)", min_value=1, max_value=120, 
+                               value=12, step=1)
+        percentual_cdi = st.number_input("✳% do CDI", 
+                                        min_value=0, max_value=200, 
+                                        value=100, step=5)
+    
+    # Cálculos
+    cdi_mensal = (1 + st.session_state.cdi_anual)**(1/12) - 1
+    taxa_mensal = cdi_mensal * (percentual_cdi / 100)
+    
+    # Simulação
+    saldo = valor_inicial
+    saldos = [valor_inicial]
+    for m in range(meses):
+        saldo += aportes_mensais
+        saldo *= (1 + taxa_mensal)
+        saldos.append(saldo)
+    
+    rendimento_bruto = saldo - valor_inicial - (aportes_mensais * meses)
+    
+    # IR Regressivo
+    if meses <= 6: ir_aliquota = 0.225
+    elif meses <= 12: ir_aliquota = 0.20
+    elif meses <= 24: ir_aliquota = 0.175
+    else: ir_aliquota = 0.15
+    
+    ir_devido = rendimento_bruto * ir_aliquota
+    saldo_liquido = saldo - ir_devido
+    
+    # Métricas
+    col_res1, col_res2, col_res3 = st.columns(3)
+    col_res1.metric("💵 Bruto Final", f"R$ {saldo:,.2f}")
+    col_res2.metric("💸 IR", f"{ir_aliquota*100:.0f}% | R$ {ir_devido:,.2f}")
+    col_res3.metric("💰 Líquido", f"R$ {saldo_liquido:,.2f}")
+    
+    # Gráfico
+    fig_inv = px.line(x=list(range(meses+1)), y=saldos, 
+                     title=f"📊 Evolução ({percentual_cdi}% CDI)",
+                     labels={'x': 'Meses', 'y': 'Saldo (R$)'})
+    fig_inv.update_traces(line_color='#2ecc71', line_width=3)
+    st.plotly_chart(fig_inv, use_container_width=True)
+    
+    st.divider()
+    
+    # Comparativo
+    st.subheader("📋 Teste Diferentes % CDI")
+    rentabilidades = [90, 95, 100, 105, 110, 120]
+    dados_tabela = []
+    for perc in rentabilidades:
+        taxa_m = cdi_mensal * (perc / 100)
+        final = valor_inicial * ((1 + taxa_m) ** meses)
+        liquido = final - (final - valor_inicial) * ir_aliquota
+        dados_tabela.append({
+            '% CDI': f'{perc}%',
+            'Bruto': f"R$ {final:,.0f}",
+            'Líquido': f"R$ {liquido:,.0f}"
+        })
+    
+    df_comp = pd.DataFrame(dados_tabela)
+    st.dataframe(df_comp, use_container_width=True)
+    
+    # Dicas
+    st.subheader("💡 Dicas do App")
+    col_tip1, col_tip2 = st.columns(2)
+    with col_tip1:
+        st.info("✅ **CDB/LCI/LCA 100% CDI**: Mais seguros")
+        st.info("🔥 **FIIs**: Renda passiva mensal")
+    with col_tip2:
+        st.warning("⚠️ **IR 22,5%** até 6 meses")
+        st.success("🚀 **>24 meses = 15% IR**")
+    
+    # Rentabilidade Anual Equivalente
+    st.caption(f"**Taxa Mensal Equivalente**: {taxa_mensal*100:.2f}%")
+
+
+# ===================== TAB 5 — CONFIGURAÇÕES =====================
+with tab5:
     st.subheader("👤 Gerenciar Perfis")
     col_p1, col_p2 = st.columns(2)
     with col_p1:
