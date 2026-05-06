@@ -86,14 +86,26 @@ def processar_recorrencias(perfil):
     conn = sqlite3.connect('financas.db')
     hoje = date.today()
     inicio_mes = hoje.replace(day=1).strftime("%Y-%m-%d")
-    query = "SELECT tipo, categoria, descrição, valor FROM transacoes WHERE perfil = ? AND recorrente = 1 AND data < ?"
+    
+    query = """
+    SELECT tipo, categoria, descrição, valor, data 
+    FROM transacoes 
+    WHERE perfil = ? AND recorrente = 1 AND data < ?
+    """
     modelos = pd.read_sql_query(query, conn, params=(perfil, inicio_mes))
     modelos = modelos.drop_duplicates(subset=['categoria', 'descrição'])
+    
     for _, row in modelos.iterrows():
-        check = conn.execute("SELECT id FROM transacoes WHERE perfil = ? AND categoria = ? AND descrição = ? AND data >= ?",
-                             (perfil, row['categoria'], row['descrição'], inicio_mes)).fetchone()
+        # Verifica se já existe no MÊS ATUAL (não no histórico todo)
+        check = conn.execute("""
+            SELECT id FROM transacoes 
+            WHERE perfil = ? AND categoria = ? AND descrição = ? 
+            AND data = ?  -- MESMA DATA do mês atual
+        """, (perfil, row['categoria'], row['descrição'], inicio_mes)).fetchone()
+        
         if not check:
-            salvar_transacao(perfil, row['tipo'], row['categoria'], row['descrição'], row['valor'], inicio_mes, True)
+            salvar_transacao(perfil, row['tipo'], row['categoria'], row['descrição'], 
+                           row['valor'], inicio_mes, True)
     conn.close()
 
 # --- FINANCIAMENTOS ---
@@ -194,11 +206,12 @@ with col_btn1:
     with st.popover("Nova Despesa", use_container_width=True):
         cat_d = st.text_input("Categoria", key="cat_d")
         desc_d = st.text_input("Descrição", key="desc_d")
-        val_d = st.number_input("Valor", min_value=0.0, key="val_d")
+        val_d = st.number_input("Valor", min_value=0.01, key="val_d")  # min_value > 0
         dat_d = st.date_input("Data", date.today(), key="dat_d")
         rec_d = st.checkbox("Recorrente?", key="rec_d")
-        if st.button("Confirmar Despesa"):
-            salvar_transacao(st.session_state['perfil_ativo'], "Despesa", cat_d, desc_d, val_d, dat_d.strftime("%Y-%m-%d"), rec_d)
+        if st.button("Confirmar Despesa") and cat_d.strip() and val_d > 0:
+            salvar_transacao(st.session_state['perfil_ativo'], "Despesa", cat_d, desc_d, val_d, 
+                           dat_d.strftime("%Y-%m-%d"), rec_d)
             st.rerun()
 with col_btn2:
     with st.popover("Nova Receita", use_container_width=True):
