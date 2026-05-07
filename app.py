@@ -890,7 +890,7 @@ with tab5:
         # Métricas
         m1, m2, m3, m4 = st.columns(4)
         m1.metric("💰 Limite", fmt(orc['valor_limite']))
-        m2.metric("💸 Gasto", fmt(gasto_total))
+        m2.metric("💸 Gastos no período", fmt(gasto_total))
         m3.metric("📊 Restante", fmt(orc['valor_limite'] - gasto_total))
         m4.metric("📅 Período", f"{formatar_data(orc['data_inicio'])} até {formatar_data(orc['data_fim'])}")
 
