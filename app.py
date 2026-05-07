@@ -6,6 +6,20 @@ from dateutil.relativedelta import relativedelta
 import plotly.express as px
 
 
+def formatar_data(data):
+    if pd.isna(data):
+        return ""
+    if isinstance(data, (datetime, date)):
+        return data.strftime("%d/%m/%Y")
+    texto = str(data)
+    for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%d-%m-%Y", "%d/%m/%Y"):
+        try:
+            return datetime.strptime(texto, fmt).strftime("%d/%m/%Y")
+        except ValueError:
+            continue
+    return texto
+
+
 # --- BANCO DE DADOS ---
 def init_db():
     conn = sqlite3.connect('financas.db')
@@ -257,6 +271,8 @@ with tab1:
 
         df_exibicao = df_filtrado.copy()
         df_exibicao['recorrente'] = df_exibicao['recorrente'].map({1: 'Fixo', 0: 'Variável'})
+        df_exibicao['data_sort'] = df_exibicao['data']
+        df_exibicao['data'] = df_exibicao['data'].apply(formatar_data)
 
         def formatar_moeda(valor):
             return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
@@ -264,19 +280,21 @@ with tab1:
         col_tab_receita, col_tab_despesa = st.columns(2)
         with col_tab_receita:
             st.write("### 🟢 Receitas")
-            df_rec = df_exibicao[df_exibicao['tipo'] == 'Receita'][['categoria', 'descrição', 'valor', 'data', 'id']]
+            df_rec = df_exibicao[df_exibicao['tipo'] == 'Receita'][['categoria', 'descrição', 'valor', 'data', 'data_sort', 'id']]
             if not df_rec.empty:
                 df_rec['valor'] = df_rec['valor'].apply(formatar_moeda)
-                st.dataframe(df_rec.sort_values(by='data', ascending=False), use_container_width=True, hide_index=True)
+                df_rec = df_rec.sort_values(by='data_sort', ascending=False).drop(columns='data_sort')
+                st.dataframe(df_rec, use_container_width=True, hide_index=True)
             else:
                 st.caption("Sem receitas neste período.")
 
         with col_tab_despesa:
             st.write("### 🔴 Despesas")
-            df_desp = df_exibicao[df_exibicao['tipo'] == 'Despesa'][['categoria', 'descrição', 'valor', 'data', 'id']]
+            df_desp = df_exibicao[df_exibicao['tipo'] == 'Despesa'][['categoria', 'descrição', 'valor', 'data', 'data_sort', 'id']]
             if not df_desp.empty:
                 df_desp['valor'] = df_desp['valor'].apply(formatar_moeda)
-                st.dataframe(df_desp.sort_values(by='data', ascending=False), use_container_width=True, hide_index=True)
+                df_desp = df_desp.sort_values(by='data_sort', ascending=False).drop(columns='data_sort')
+                st.dataframe(df_desp, use_container_width=True, hide_index=True)
             else:
                 st.caption("Sem despesas neste período.")
 
@@ -421,19 +439,14 @@ with tab3:
             with col_n:
                 st.write(f"**#{int(row['numero_parcela'])}**")
             with col_venc:
-                try:
-                    venc_fmt = datetime.strptime(row['data_vencimento'], "%Y-%m-%d").strftime("%d/%m/%Y")
-                except:
-                    venc_fmt = row['data_vencimento']
-                st.write(venc_fmt)
+                st.write(formatar_data(row['data_vencimento']))
             with col_val:
                 st.write(fmt(row['valor']))
             with col_status:
                 if pago:
-                    try:
-                        data_pag = datetime.strptime(row['data_pagamento'], "%Y-%m-%d").strftime("%d/%m/%Y")
-                        st.success(f"✅ Paga em {data_pag}")
-                    except:
+                    if row['data_pagamento']:
+                        st.success(f"✅ Paga em {formatar_data(row['data_pagamento'])}")
+                    else:
                         st.success("✅ Paga")
                 else:
                     st.warning("⏳ Pendente")
