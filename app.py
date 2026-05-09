@@ -392,6 +392,31 @@ with tab1:
     with c_f2:
         d_fim1 = st.date_input("Fim", value=date.today(), key="t1_f")    
 
+    # --- BOTÕES DE LANÇAMENTO
+    col_btn1, col_btn2, _ = st.columns([1.5, 1.5, 5])
+    with col_btn1:
+        with st.popover("Nova Receita", use_container_width=True):
+            cat_r = st.text_input("Categoria", key="cat_r")
+            desc_r = st.text_input("Descrição", key="desc_r")
+            val_r = st.number_input("Valor", min_value=0.0, key="val_r")
+            dat_r = st.date_input("Data", date.today(), key="dat_r")
+            rec_r = st.checkbox("Recorrente?", key="rec_r")
+            if st.button("Confirmar Receita"):
+                salvar_transacao(st.session_state['perfil_ativo'], "Receita", cat_r, desc_r, val_r, dat_r.strftime("%Y-%m-%d"), rec_r)
+                st.rerun()
+    st.divider()
+    with col_btn2:
+        with st.popover("Nova Despesa", use_container_width=True):
+            cat_d = st.text_input("Categoria", key="cat_d")
+            desc_d = st.text_input("Descrição", key="desc_d")
+            val_d = st.number_input("Valor", min_value=0.01, key="val_d")
+            dat_d = st.date_input("Data", date.today(), key="dat_d")
+            rec_d = st.checkbox("Recorrente?", key="rec_d")
+            if st.button("Confirmar Despesa") and cat_d.strip() and val_d > 0:
+                salvar_transacao(st.session_state['perfil_ativo'], "Despesa", cat_d, desc_d, val_d, 
+                            dat_d.strftime("%Y-%m-%d"), rec_d)
+                st.rerun()
+
     if not df_bruto.empty:
         df_bruto['data'] = pd.to_datetime(df_bruto['data'])
         df_filtrado = df_bruto[(df_bruto['data'].dt.date >= d_ini1) & (df_bruto['data'].dt.date <= d_fim1)].copy()
@@ -410,31 +435,6 @@ with tab1:
         df_exibicao['recorrente'] = df_exibicao['recorrente'].map({1: 'Fixo', 0: 'Variável'})
         df_exibicao['data_sort'] = df_exibicao['data']
         df_exibicao['data'] = df_exibicao['data'].apply(formatar_data)
-
-        # --- BOTÕES DE LANÇAMENTO ---
-        col_btn1, col_btn2, _ = st.columns([1.5, 1.5, 5])
-        with col_btn1:
-            with st.popover("Nova Receita", use_container_width=True):
-                cat_r = st.text_input("Categoria", key="cat_r")
-                desc_r = st.text_input("Descrição", key="desc_r")
-                val_r = st.number_input("Valor", min_value=0.0, key="val_r")
-                dat_r = st.date_input("Data", date.today(), key="dat_r")
-                rec_r = st.checkbox("Recorrente?", key="rec_r")
-                if st.button("Confirmar Receita"):
-                    salvar_transacao(st.session_state['perfil_ativo'], "Receita", cat_r, desc_r, val_r, dat_r.strftime("%Y-%m-%d"), rec_r)
-                    st.rerun()
-
-        with col_btn2:
-            with st.popover("Nova Despesa", use_container_width=True):
-                cat_d = st.text_input("Categoria", key="cat_d")
-                desc_d = st.text_input("Descrição", key="desc_d")
-                val_d = st.number_input("Valor", min_value=0.01, key="val_d")
-                dat_d = st.date_input("Data", date.today(), key="dat_d")
-                rec_d = st.checkbox("Recorrente?", key="rec_d")
-                if st.button("Confirmar Despesa") and cat_d.strip() and val_d > 0:
-                    salvar_transacao(st.session_state['perfil_ativo'], "Despesa", cat_d, desc_d, val_d, 
-                                dat_d.strftime("%Y-%m-%d"), rec_d)
-                    st.rerun()
 
         def formatar_moeda(valor):
             return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
@@ -485,7 +485,7 @@ with tab1:
                     excluir_transacao(id_del)
                     st.rerun()
     else:
-        st.info("Nenhum dado.")
+        st.info("Nenhum dado. Use os botões acima para adicionar sua primeira receita ou despesa.")
 
 # ===================== TAB 2 — GRÁFICOS =====================
 with tab2:
